@@ -4,7 +4,6 @@ import logging
 import json
 from time import time, sleep
 
-from httpx import Timeout
 from urllib.parse import urlparse, urlunparse
 
 log_level = os.environ.get('INPUT_LOG_LEVEL', 'INFO')
