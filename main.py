@@ -4,8 +4,23 @@ import logging
 import json
 from time import time, sleep
 
+from httpx import Timeout
+from urllib.parse import urlparse, urlunparse
+
 log_level = os.environ.get('INPUT_LOG_LEVEL', 'INFO')
 logging.basicConfig(format='JENKINS_ACTION: %(message)s', level=log_level)
+
+
+def replace_url(original_url, new_domain, new_port, new_prefix):
+    parsed_url = urlparse(original_url)
+    # 创建新的 netloc
+    new_netloc = f"{new_domain}:{new_port}"
+    # 添加前缀到路径
+    new_path = parsed_url.path
+    if new_prefix:
+        new_path = new_prefix + parsed_url.path
+    # 构建新的 URL
+    return urlunparse(parsed_url._replace(netloc=new_netloc, path=new_path))
 
 
 def main():
@@ -23,12 +38,17 @@ def main():
     start_timeout = int(os.environ.get("INPUT_START_TIMEOUT"))
     interval = int(os.environ.get("INPUT_INTERVAL"))
 
+    input_url = urlparse(url)
+    domain = input_url.hostname
+    port = input_url.port
+    path = input_url.path
+
     if username and api_token:
         auth = (username, api_token)
     else:
         auth = None
         logging.info(
-            'Username or token not provided. Connecting without authentication.') # noqa
+            'Username or token not provided. Connecting without authentication.')  # noqa
 
     if parameters:
         try:
@@ -55,7 +75,11 @@ def main():
 
     logging.info('Successfully connected to Jenkins.')
 
-    queue_item = jenkins.build_job(job_name, **parameters)
+    job = jenkins.get_job(job_name)
+    job.url = replace_url(job.url, domain, port, path)
+
+    queue_item = job.build(**parameters)
+    queue_item.url = replace_url(queue_item.url, domain, port, path)
 
     logging.info('Requested to build job.')
 
@@ -63,18 +87,19 @@ def main():
     sleep(interval)
     while time() - t0 < start_timeout:
         build = queue_item.get_build()
+        build.url = replace_url(build.url, domain, port, path)
         if build:
             break
         logging.info(f'Build not started yet. Waiting {interval} seconds.')
         sleep(interval)
     else:
         raise Exception(
-            f"Could not obtain build and timed out. Waited for {start_timeout} seconds.") # noqa
+            f"Could not obtain build and timed out. Waited for {start_timeout} seconds.")  # noqa
 
     build_url = build.url
     logging.info(f"Build URL: {build_url}")
     with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-      print(f'build_url={build_url}', file=fh)
+        print(f'build_url={build_url}', file=fh)
     print(f"::notice title=build_url::{build_url}")
 
     if not wait:
@@ -96,7 +121,7 @@ def main():
         sleep(interval)
     else:
         raise Exception(
-            f"Build has not finished and timed out. Waited for {timeout} seconds.") # noqa
+            f"Build has not finished and timed out. Waited for {timeout} seconds.")  # noqa
 
 
 if __name__ == "__main__":
