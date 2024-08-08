@@ -15,7 +15,7 @@ You need to setup a Jenkins API token if you require authentication with Jenkins
 It's best practice to save the token in [GitHub secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets).
 
 ### Example workflow
-
+ 
 ```yaml
 name: jenkins-CI
 
