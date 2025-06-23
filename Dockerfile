@@ -11,4 +11,5 @@ FROM gcr.io/distroless/python3-debian10
 COPY --from=builder /app /app
 WORKDIR /app
 ENV PYTHONPATH /app
+RUN echo "test"
 CMD ["/app/main.py"]
